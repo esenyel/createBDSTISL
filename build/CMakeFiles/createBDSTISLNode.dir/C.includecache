@@ -1,0 +1,30 @@
+#IncludeRegexLine: ^[ 	]*#[ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/home/jaguar/fuerte_workspace/sandbox/createBDSTISL/src/cluster.c
+time.h
+-
+stdlib.h
+-
+math.h
+-
+float.h
+-
+limits.h
+-
+string.h
+-
+cluster.h
+/home/jaguar/fuerte_workspace/sandbox/createBDSTISL/src/cluster.h
+windows.h
+-
+
+/home/jaguar/fuerte_workspace/sandbox/createBDSTISL/src/cluster.h
+windows.h
+-
+
