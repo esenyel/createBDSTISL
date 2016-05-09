@@ -131,22 +131,6 @@ double compareHistHK( InputArray _H1, InputArray _H2, int method );
 // FOR debugging
 std::vector< std::vector<float> > readInvariantVectors();
 
-
-
-
-/*class UninformativeFrame
-{
-public:
-    UninformativeFrame();
-    int sat_mean;
-    int sat_var;
-    int frame_no;
-
-
-};
-UninformativeFrame*/
-
-
 ros::Timer timer;
 
 std::vector<LearnedPlace> places;
@@ -177,7 +161,7 @@ std::vector<Place> currentPlaces;
 double tau_h, tau_r;
 int tau_l;
 
-
+// a function to construct invariant matrix from learned places
 void constructInvariantsMatrix(std::vector<LearnedPlace> plcs)
 {
     if(invariants.size() > 0)
@@ -189,6 +173,7 @@ void constructInvariantsMatrix(std::vector<LearnedPlace> plcs)
     }
 }
 
+// a function to update topological map and inster it to the knowledge database
 void updateTopologicalMap(int node1, int node2)
 {
     std::pair<int,int> mapNode;
@@ -202,13 +187,13 @@ void updateTopologicalMap(int node1, int node2)
     topmap.connections.push_back(mapNode);
 
 
-    // Iliskiyi topolojik haritaya yazdir
+    // Write relation to the topological map
     knowledgedbmanager.insertTopologicalMapRelation(topmap.connections.size(),mapNode);
 
 
 
 }
-// Detected Place i Learned Place e ekle
+// A function to convert a place to a learned place
 LearnedPlace convertPlacetoLearnedPlace(Place place)
 {
     LearnedPlace aplace;
@@ -223,28 +208,21 @@ LearnedPlace convertPlacetoLearnedPlace(Place place)
         aplace.memberPlaces = cv::Mat(1,1,CV_16UC1);
         aplace.memberPlaces.at<unsigned short>(0,0) = (unsigned short)place.id;
     }
-
+    // insert learned place to the knowledge dataset
     knowledgedbmanager.insertLearnedPlace(aplace);
 
     learnedPlaceCounter++;
-    /* else
-    {
-        Mat tempMat = cv::Mat(1,1,CV_16UC1);
-        tempMat.at<unsigned short>(0,0) = (unsigned short)place.id;
-        vconcat(tempMat,aplace.memberPlaces);
-    }*/
-    // aplace.memberPlaces.push_back(place.id);
 
-    // learnedPlaceCounter++;
     return aplace;
 }
 
 QFile file;
 QTextStream strm;
-// Callback for place detection
+
+// Callback function for place detection. The input is the place id signal from the place detection node
 void placeCallback(std_msgs::Int16 placeId)
 {
-
+    // read the place from the database
     Place aPlace = dbmanager.getPlace((int)placeId.data);
 
     //  currentPlace = dbmanager.getPlace((int)placeId.data);
@@ -282,7 +260,7 @@ void placeCallback(std_msgs::Int16 placeId)
 }
 
 
-
+// A callback function for the main file, the input is main file path string from the place detection node
 void mainFilePathCallback(std_msgs::String mainfp)
 {
     std::string tempstr = mainfp.data;
@@ -303,7 +281,8 @@ void mainFilePathCallback(std_msgs::String mainfp)
     {
         qDebug()<<"Places db opened";
     }
-
+    // if usePreviousMemory is true in place detection, it constructs previous place invariants and perform bdst calculations
+    // the recognition will be based on the previous knowledge
     if(knowledgedbmanager.openDB(knowledge_dbpath,"knowledge"))
     {
         qDebug()<<"Knowledge db opened";
@@ -372,6 +351,7 @@ int main (int argc, char** argv)
     tau_l = 2;
     tau_r = 2.5;
 
+    // get recognition parameters
     pnh.getParam("tau_h",tau_h);
     pnh.getParam("tau_r",tau_r);
     pnh.getParam("tau_l",tau_l);
@@ -380,87 +360,8 @@ int main (int argc, char** argv)
     ros::Subscriber sbc = nh.subscribe<std_msgs::Int16>("placeDetectionISL/placeID",5, placeCallback);
     ros::Subscriber filepathsubscriber = nh.subscribe<std_msgs::String>("placeDetectionISL/mainFilePath",2,mainFilePathCallback);
 
-    //  QFile file("/home/hakan/ros_workspace/createBDSTISL/invariants.txt");
-
-    //qDebug()<<sysinfo::bufferram;
-
-
-    /*  const int nrows = 6;
-      const int ncols = 600;
-      double** data = new double*[nrows];
-     int** mask = new int*[nrows];*/
-    /*********************************************************************************************************************/
-    // For performing debugging through getting invariants from Matlab and putting it into the text file invariant3.txt
-    //   invariants = readInvariantVectors();
-
-    //  performBDSTCalculations();
-    /********************************************************************************************************************/
-
-
-    //  std::vector<float> resultt = invariants[0]+invariants[1];
-
-    //  std::cout<<resultt[0]<<" "<<invariants[0][0]<<" "<<invariants[1][0]<<std::endl;
-
-
-
-    /*  for(int i = 0; i < nrows; i++)
-    {
-        for(int j = 0; j < ncols; j++ )
-        {
-            mask[i][j] = 1;
-
-        }
-
-    }*/
-
 
     ros::Rate loop(50);
-
-
-    /*  if(dbmanager.openDB("/home/hakan/Development/ISL/Datasets/Own/deneme/db1.db"))
-    {
-        qDebug()<<"Places db opened";
-    }
-
-    if(knowledgedbmanager.openDB("/home/hakan/Development/ISL/Datasets/Own/deneme/knowledge.db","knowledge"))
-    {
-        qDebug()<<"Knowledge db opened";
-    }*/
-
-
-    //  trainSVM();
-
-
-    /*    cv::Mat mt(600,1,CV_32FC1);
-    memcpy(mt.data,invariants[1].data(),invariants[1].size()*sizeof(float));
-
-    aPlace.meanInvariant = mt;
-
-    qDebug()<<aPlace.meanInvariant.at<float>(599,0);
-
-    aPlace.id = 12;*/
-
-    //  performTopDownBDSTRecognition(1,2,bdst, aPlace);
-
-    /*   Place aPlace;
-
-    if(dbmanager.openDB("/home/hakan/Development/ISL/Datasets/Own/deneme/db1.db"))
-    {
-       aPlace = DatabaseManager::getPlace(15);
-
-       qDebug()<<aPlace.memberIds.rows<<aPlace.memberIds.cols;
-
-       qDebug()<<aPlace.memberInvariants.rows<<aPlace.memberInvariants.cols;
-
-       performTopDownBDSTRecognition(1.1,2,bdst, aPlace);
-
-    }*/
-
-
-    //   calculateCostFunction(2,3,aPlace,aPlace);
-
-
-    //timer.start();
 
     while(ros::ok())
     {
@@ -481,21 +382,23 @@ int main (int argc, char** argv)
             if(bdst)
 
             {
+                // Perform Top Down BDST recognition to recognize the current place, to use Bottom up recognition use performBottomUpBDSTRecognition function
                 int result = performTopDownBDSTRecognition(tau_r,tau_l,bdst,currentPlace);
                 // int result= performBottomUpBDSTRecognition(tau_r,tau_l,bdst,currentPlace); //performTopDownBDSTRecognition(1.25,2,bdst,currentPlace);
 
+                // if recognized, result is the recognized place id, if -1, the place is not recongized.
                 qDebug()<<"Recognized state"<<result;
 
 
                 // We didn't recognize
                 if(result < 0)
                 {
-                    // Place lastPlace = places.back();
-                    //  LearnedPlace lastlearnedplace = places.back();
+                    // convert current place to a learned one and update the topological map
                     LearnedPlace anewLearnedPlace = convertPlacetoLearnedPlace(currentPlace);
 
                     updateTopologicalMap(lastTopMapNodeId,anewLearnedPlace.id);
 
+                    // add learned place to whole places and reperform BDST calculations
                     places.push_back(anewLearnedPlace);
 
                     constructInvariantsMatrix(places);
@@ -507,7 +410,6 @@ int main (int argc, char** argv)
                 {
                     // We should just update the place that bdst belongs to
                     // The topological map will not be updated only the last node should be updated
-                    std::cout << "**************ENTERED**************" << std::endl;
 
                     LearnedPlace recognizedPlace = places[result];
 
@@ -588,6 +490,7 @@ int main (int argc, char** argv)
 
     }
 
+    // insert BDST level to the knowledge database
     if(bdst)
     {
         for(int i = 0 ; i < bdst->levels.size(); i++)
@@ -615,6 +518,7 @@ int main (int argc, char** argv)
 
 
 }
+// a function to construct BDST based on place invariants
 void performBDSTCalculations()
 {
     const int nrows = invariants.size();
@@ -647,6 +551,7 @@ void performBDSTCalculations()
 
     }
 
+    // construct binary tree based on the place invariants
     Node* binarytree = calculateBinaryBDST(nrows,ncols,data);
 
     if(bdst)
@@ -656,6 +561,7 @@ void performBDSTCalculations()
 
    // calculateMergedBDST(tau_h,nrows-1,nrows,binarytree,bdst);
 
+    // construct merged bdst from the contructed binary tree
      calculateMergedBDSTv2(tau_h,nrows-1,nrows,binarytree,bdst);
 
 
@@ -1589,14 +1495,6 @@ std::vector< std::vector<float>   >  readInvariantVectors()
                     invariants[i].push_back(list.at(i).toFloat());
 
                 }
-                /* data[0][j] = list.at(0).toDouble();
-                  data[1][j] = list.at(1).toDouble();
-                  data[2][j] = list.at(2).toDouble();
-                  data[3][j] = list.at(3).toDouble();
-                  data[4][j] = list.at(4).toDouble();
-                  data[5][j] = list.at(5).toDouble();*/
-
-                //     qDebug()<<data[0][j]<<data[1][j]<<data[2][j];
 
                 j++;
             }
@@ -1616,6 +1514,7 @@ std::vector< std::vector<float>   >  readInvariantVectors()
 
     return invariants;
 }
+// a function to train SVM
 void trainSVM()
 {
 
@@ -1652,12 +1551,6 @@ void trainSVM()
     // qDebug()<<testData.at<float>(0,1);
 
     qDebug()<<SVM.predict(testData,true);
-
-
-
-
-
-
 
 }
 static inline float computeSquare (float x) { return x*x; }
@@ -1915,29 +1808,7 @@ int performBottomUpBDSTRecognition(float tau_g, float tau_l, BDST *bdst, Place d
 
             }
 
-
-
-            //   qDebug()<<aPlace.memberInvariants.rows<<aPlace.memberInvariants.cols;
-
-            //      performSVM(aPlace.memberInvariants,aPlace.memberInvariants);
-
-            //     DatabaseManager::closeDB();
-
-            //  break;
-
-            // }
-
-
-
         }
-        //    std::vector<double> levelMemberInvariant = bdst->levels.at(j).
-
-
-
-        //  }
-
-
-
 
     }
 
@@ -2117,27 +1988,7 @@ int performTopDownBDSTRecognition(float tau_g, float tau_l, BDST *bdst, Place de
                 return -1;
             }
 
-            //   qDebug()<<aPlace.memberInvariants.rows<<aPlace.memberInvariants.cols;
-
-            //      performSVM(aPlace.memberInvariants,aPlace.memberInvariants);
-
-            //     DatabaseManager::closeDB();
-
-            //  break;
-
-            // }
-
-
-
         }
-        //    std::vector<double> levelMemberInvariant = bdst->levels.at(j).
-
-
-
-        //  }
-
-
-
 
     }
 
@@ -2272,7 +2123,7 @@ void calculateMeanInvariantsOfBDST(BDST *bdst)
                 }
                 else
                 {
-
+                    // this part is corrected by Esen, it should go until j, otherwise it tries to reach an uncalculated matrix
                     //for(int k = 0; k < bdst->levels.size(); k++)
                     for(int k = 0; k < j; k++)
                     {
@@ -2459,21 +2310,11 @@ float calculateCostFunctionv2(float firstDistance, float secondDistance, Learned
     //  {
     // Place aPlace = DatabaseManager::getPlace(closestPlace.id);
 
-
+    // for KNN results performKNN function can be used, now SVM classification is used
     //votePercentage= performKNN(closestPlace.memberInvariants, secondClosestPlace.memberInvariants, detected_place.memberInvariants);
     votePercentage = performSVM(closestPlace.memberInvariants,detected_place.memberInvariants);
 
     qDebug()<<"Vote percentage"<<votePercentage;
-
-    //  Mat trainingVector;
-
-    //  trainingVector = aPlace.memberInvariants;
-
-    //qDebug()<<trainingVector.rows<<trainingVector.cols;
-
-
-    //  DatabaseManager::closeDB();
-    // }
 
     result = firstPart+secondPart+(1-votePercentage);
     std::cout << "result: " << result<< std::endl;
@@ -2482,6 +2323,7 @@ float calculateCostFunctionv2(float firstDistance, float secondDistance, Learned
 
 }
 
+// performSVM classification
 float performSVM(cv::Mat trainingVector, cv::Mat testVector)
 {
     //  Mat trainingDataMat(4, 2, CV_32FC1, trainingData);
@@ -2507,15 +2349,6 @@ float performSVM(cv::Mat trainingVector, cv::Mat testVector)
     CvSVM SVM;
 
     SVM.train(trainingVector, labelsMat, Mat(), Mat(), params);
-
-    // Mat testData(1,2,CV_32FC1);
-
-    // testData.at<float>(0,0) = 501;
-    // testData.at<float>(0,1) = 10;
-
-    // qDebug()<<testData.at<float>(0,1);
-
-    //Mat resultsVector;
 
     float summ = 0;
 
