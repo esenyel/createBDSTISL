@@ -4,12 +4,9 @@
 #include "bdst.h"
 #include "Utility.h"
 
-
-
 /*#include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>*/
 #include <opencv2/ml/ml.hpp>
-
 
 #include <ros/ros.h>
 #include <std_msgs/String.h>
@@ -20,8 +17,6 @@
 #include <vector>
 #include <algorithm>
 #include <numeric>
-
-
 
 #include <QDir>
 #include <QDebug>
@@ -210,6 +205,9 @@ LearnedPlace convertPlacetoLearnedPlace(Place place)
     }
     // insert learned place to the knowledge dataset
     knowledgedbmanager.insertLearnedPlace(aplace);
+    std::cout << "aplace id: " << aplace.id << std::endl;
+    std::cout << "aplace members:" << aplace.memberPlaces << std::endl;
+
 
     learnedPlaceCounter++;
 
@@ -218,6 +216,9 @@ LearnedPlace convertPlacetoLearnedPlace(Place place)
 
 QFile file;
 QTextStream strm;
+QFile file_recog;
+QTextStream strm_recog;
+
 
 // Callback function for place detection. The input is the place id signal from the place detection node
 void placeCallback(std_msgs::Int16 placeId)
@@ -258,7 +259,6 @@ void placeCallback(std_msgs::Int16 placeId)
     performRecognition = true;
 
 }
-
 
 // A callback function for the main file, the input is main file path string from the place detection node
 void mainFilePathCallback(std_msgs::String mainfp)
@@ -349,7 +349,7 @@ int main (int argc, char** argv)
     tau_h = 0.1;
    // tau_r = 1.8;
     tau_l = 2;
-    tau_r = 2.5;
+    tau_r = 2.4;
 
     // get recognition parameters
     pnh.getParam("tau_h",tau_h);
@@ -359,7 +359,10 @@ int main (int argc, char** argv)
 
     ros::Subscriber sbc = nh.subscribe<std_msgs::Int16>("placeDetectionISL/placeID",5, placeCallback);
     ros::Subscriber filepathsubscriber = nh.subscribe<std_msgs::String>("placeDetectionISL/mainFilePath",2,mainFilePathCallback);
+    ros::Publisher placeRecognitionPublisher = nh.advertise<std_msgs::Int16>("createBDSTISL/recognizedPlaceID",5);
 
+
+    int recognition_counter = 0;
 
     ros::Rate loop(50);
 
@@ -411,7 +414,42 @@ int main (int argc, char** argv)
                     // We should just update the place that bdst belongs to
                     // The topological map will not be updated only the last node should be updated
 
+                    placeRecognitionPublisher.publish(result+1);
+
                     LearnedPlace recognizedPlace = places[result];
+
+                    QString recognizedPlaceFilePath = mainFilePath;
+
+                    recognizedPlaceFilePath = recognizedPlaceFilePath.append("/recognized_places.txt");
+
+                    file_recog.setFileName(recognizedPlaceFilePath);
+
+                    if(file_recog.open(QFile::Append))
+                    {
+                        qDebug()<<"Recognized place file path has been opened";
+                        strm_recog.setDevice(&file_recog);
+
+                    }
+
+                    if (strm_recog.device()!=NULL){
+
+                        strm_recog << "\n Current Place Members:\n";
+
+                        for (int i=0; i<currentPlace.memberIds.rows; i++){
+
+                            strm_recog << currentPlace.memberIds.at<int>(i,0) << ",";
+                        }
+
+                        strm_recog << "\n Recognized Place Members:\n";
+
+                        for (int i=0; i<recognizedPlace.memberIds.rows; i++){
+
+                            strm_recog << recognizedPlace.memberIds.at<int>(i,0) << ",";
+                        }
+
+                    }
+
+                    recognition_counter ++;
 
                     Mat totalMemberInvariants;
 
@@ -437,14 +475,19 @@ int main (int argc, char** argv)
 
                     recognizedPlace.memberPlaces = totalMemberPlaces;
 
-                    for(int k = 0; k < recognizedPlace.memberPlaces.rows; k++)
-                    {
+                    /*for(int k = 0; k < recognizedPlace.memberPlaces.rows; k++)
+                    {                    
+                        qDebug()<< "Recognized place number: " << recognizedPlace.id;
                         qDebug()<<"Members of recognized place"<<recognizedPlace.memberPlaces.at<unsigned short>(k,0);
-                    }
+                    }*/
 
                     places[result] = recognizedPlace;
 
                     knowledgedbmanager.insertLearnedPlace(recognizedPlace);
+
+                    std::cout << "Recognized place id: " << recognizedPlace.id << std::endl;
+                    std::cout << "Recognized place members: " << recognizedPlace.memberPlaces << std::endl;
+                    std::cout << "Recognized place member Ids: " << recognizedPlace.memberIds << std::endl;
 
                     updateTopologicalMap(lastTopMapNodeId,recognizedPlace.id);
 
@@ -456,12 +499,11 @@ int main (int argc, char** argv)
 
                 qDebug()<<(float)(stoptime-starttime);
 
-                if(strm.device() != NULL)
+                if(strm.device() != NULL){
                     strm<<(float)(stoptime-starttime)<<"\n";
-
+                }
 
             }
-
 
         }
         else if(places.size() >= MIN_NO_PLACES)
@@ -491,15 +533,23 @@ int main (int argc, char** argv)
     }
 
     // insert BDST level to the knowledge database
-    if(bdst)
+    /*if(bdst)
     {
         for(int i = 0 ; i < bdst->levels.size(); i++)
         {
             knowledgedbmanager.insertBDSTLevel(i+1,bdst->levels[i]);
 
         }
-    }
+    }*/
 
+    /*int knowledge_size = knowledgedbmanager.getLearnedPlaceMaxID();
+
+    for(int i=0; i<knowledge_size; i++){
+
+        LearnedPlace dummy_place = knowledgedbmanager.getLearnedPlace(i);
+        std::cout << " Learned place " << i << "members: " << dummy_place.memberIds << std::endl;
+
+    }*/
 
     //  timer.stop();
 
@@ -1932,33 +1982,92 @@ int performTopDownBDSTRecognition(float tau_g, float tau_l, BDST *bdst, Place de
             qDebug()<<"Closest terminal node"<<firstClosestMember.second;
             qDebug()<<"Second closest terminal node"<<secondClosestMember.second;
 
+            std::cout << "closest terminal node parents: " << std::endl;
+            for (int k = 0; k < currentLevel.parentNodes.size(); k++){
+                std::cout << currentLevel.parentNodes.at(k) << std::endl;
+            }
+
             //  if(dbmanager.openDB("/home/hakan/Development/ISL/Datasets/Own/deneme/db1.db"))
             //   {
 
             LearnedPlace aPlace = dbmanager.getLearnedPlace(firstClosestMember.second+1);//dbmanager.getPlace((firstClosestMember.second+1));
+            LearnedPlace aPlaceSecond = dbmanager.getLearnedPlace(secondClosestMember.second+1);
+
 
             //Place aPlace = dbmanager.getPlace((firstClosestMember.second+1));
 
-            std::cout << "aPlace.memberInvariants.size()" << aPlace.memberInvariants.rows << "x" << aPlace.memberInvariants.cols << std::endl;
-
             float costValue = 100.0;
+            float costValue2 = 100.0;
 
             if(secondClosestMember.second < invariants.size())
             {
 
                 //LearnedPlace aPlace2 = dbmanager.getLearnedPlace(secondClosestMember.second+1);//dbmanager.getPlace((secondClosestMember.second+1));
-
-               // costValue = calculateCostFunctionv3(firstClosestMember.first,secondClosestMember.first,aPlace,detected_place);
-               costValue = calculateCostFunctionv2(firstClosestMember.first,secondClosestMember.first,aPlace,detected_place);
-            }
-            else
-                //costValue =  calculateCostFunctionv3(firstClosestMember.first,secondClosestMember.first,aPlace,detected_place);
+                // costValue = calculateCostFunctionv3(firstClosestMember.first,secondClosestMember.first,aPlace,detected_place);
                 costValue = calculateCostFunctionv2(firstClosestMember.first,secondClosestMember.first,aPlace,detected_place);
+                // Esen checking the SVM results for second closest member
+
+                costValue2 = calculateCostFunctionv2(firstClosestMember.first,secondClosestMember.first,aPlaceSecond,detected_place);
+
+            }
+            else{
+                //costValue =  calculateCostFunctionv3(firstClosestMember.first,secondClosestMember.first,aPlace,detected_place);
+                /* std::vector<float>  dummy_meaninv;
+                cv::Mat mean_inv_dummy;
+                for(uint j = 0; j < levelIndex; j++)
+                {
+                    if(bdst->levels.at(j).connectionIndex == secondClosestMember.second)
+                    {
+                        dummy_meaninv = bdst->levels.at(j).meanInvariant;
+
+
+                    }
+                }
+
+                for (int i=0; i < dummy_meaninv.size(); i++){
+
+                    mean_inv_dummy.at<float>(i,0) = dummy_meaninv.at(i);
+
+                }
+
+                aPlaceSecond.meanInvariant = mean_inv_dummy;*/
+
+                costValue = calculateCostFunctionv2(firstClosestMember.first,secondClosestMember.first,aPlace,detected_place);
+
+                Level dummyLevel, dummyLevel2;
+                /*for(uint j = 0; j < bdst->levels.size(); j++)
+                {
+                    if(bdst->levels.at(j).connectionIndex == secondClosestMember.second)
+                    {
+                        dummyLevel = bdst->levels.at(j);
+                        std::cout << "dummy level members size: " << dummyLevel.members.size() << std::endl;
+                        std::cout << "dummy level members: " << std::endl;
+                        for (int m=0; m<dummyLevel.members.size(); m++){
+                             std::cout << dummyLevel.members.at(m) << std::endl;
+                        }
+                        std::cout << "dummy level parents: " << std::endl;
+                        for (int n=0; n<dummyLevel.parentNodes.size(); n++){
+                            std::cout << dummyLevel.parentNodes.at(n) << std::endl;
+                        }
+
+                    }
+                }*/
+
+            }
+
+            //std::cout << "cost value: " << costValue << std::endl;
+            std::cout << "closest sum elements: " << firstClosestMember.first << std::endl;
+            //std::cout << "cost value2: " << costValue2 << std::endl;
+            std::cout << "second closest sum elements: " << secondClosestMember.first << std::endl;
+
 
             if(costValue <= tau_g)
             {
                 qDebug()<<"Recognized";
+
                 return firstClosestMember.second;
+
+
             }
 
             qDebug()<<"Not Recognized Searching for next level...";
@@ -2309,7 +2418,6 @@ float calculateCostFunctionv2(float firstDistance, float secondDistance, Learned
     //  if(DatabaseManager::openDB("/home/hakan/Development/ISL/Datasets/Own/deneme/db1.db"))
     //  {
     // Place aPlace = DatabaseManager::getPlace(closestPlace.id);
-
     // for KNN results performKNN function can be used, now SVM classification is used
     //votePercentage= performKNN(closestPlace.memberInvariants, secondClosestPlace.memberInvariants, detected_place.memberInvariants);
     votePercentage = performSVM(closestPlace.memberInvariants,detected_place.memberInvariants);
@@ -2317,7 +2425,7 @@ float calculateCostFunctionv2(float firstDistance, float secondDistance, Learned
     qDebug()<<"Vote percentage"<<votePercentage;
 
     result = firstPart+secondPart+(1-votePercentage);
-    std::cout << "result: " << result<< std::endl;
+    // std::cout << "result: " << result<< std::endl;
     return result;
 
 
@@ -2329,12 +2437,9 @@ float performSVM(cv::Mat trainingVector, cv::Mat testVector)
     //  Mat trainingDataMat(4, 2, CV_32FC1, trainingData);
     float result = 0;
 
-    std::cout << "training vector: " << trainingVector.rows << "x" << trainingVector.cols << std::endl;
-
     cv::transpose(trainingVector,trainingVector);
 
     cv::transpose(testVector,testVector);
-
     Mat labelsMat;
 
     // Set up SVM's parameters
@@ -2359,7 +2464,6 @@ float performSVM(cv::Mat trainingVector, cv::Mat testVector)
 
 
     ///   cv::Scalar summ = cv::sum(resultsVector);
-
     result = (float)summ/testVector.rows;
 
     return result;
